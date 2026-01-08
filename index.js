@@ -5,8 +5,8 @@ const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
 const TelegramBot = require('node-telegram-bot-api');
 
-// Bot setup
-const bot = new TelegramBot(process.env["bot"], { polling: true });
+// Bot setup (Webhook mode for Vercel)
+const bot = new TelegramBot(process.env["bot"]); // No polling: true
 
 // Middleware setup
 const jsonParser = bodyParser.json({ limit: 1024 * 1024 * 20, type: 'application/json' });
@@ -20,8 +20,29 @@ app.set("view engine", "ejs");
 
 // Host URL Configuration
 // For Vercel, you should set HOST_URL in your environment variables
-var hostURL = process.env.HOST_URL || "YOUR_VERCEL_DOMAIN_HERE";
+var hostURL = process.env.HOST_URL;
 var use1pt = false;
+
+// 1. Webhook Route - Telegram sends messages here
+app.post('/bot' + process.env["bot"], (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// 2. Set Webhook Route - Run this ONCE after deployment
+// Visit: https://YOUR-VERCEL-APP.vercel.app/setwebhook
+app.get('/setwebhook', async (req, res) => {
+  if (!hostURL || !process.env["bot"]) {
+    return res.send("Error: HOST_URL or bot token not set in Vercel Environment Variables.");
+  }
+  const webhookUrl = `${hostURL}/bot${process.env["bot"]}`;
+  try {
+    await bot.setWebHook(webhookUrl);
+    res.send(`Webhook set successfully to: ${webhookUrl}`);
+  } catch (error) {
+    res.send(`Error setting webhook: ${error.message}`);
+  }
+});
 
 // Routes
 app.get("/w/:path/:uri", (req, res) => {
