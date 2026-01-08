@@ -11,10 +11,10 @@ if (!process.env["bot"]) {
   console.error("Error: 'bot' environment variable is missing.");
 }
 
-const bot = new TelegramBot(process.env["bot"], { polling: true });
+const app = express();
 var jsonParser = bodyParser.json({ limit: 1024 * 1024 * 20, type: 'application/json' });
 var urlencodedParser = bodyParser.urlencoded({ extended: true, limit: 1024 * 1024 * 20, type: 'application/x-www-form-urlencoded' });
-const app = express();
+
 app.use(jsonParser);
 app.use(urlencodedParser);
 app.use(cors());
@@ -22,6 +22,8 @@ app.set("view engine", "ejs");
 
 // Determine Host URL Logic (Replit, Vercel, or Local)
 var hostURL;
+var isVercel = !!process.env.VERCEL_URL;
+
 if (process.env.REPLIT_DEV_DOMAIN) {
   hostURL = `https://${process.env.REPLIT_DEV_DOMAIN}`;
 } else if (process.env.VERCEL_URL) {
@@ -29,6 +31,43 @@ if (process.env.REPLIT_DEV_DOMAIN) {
 } else {
   hostURL = "http://localhost:5000";
 }
+
+// Initialize Bot
+const token = process.env["bot"];
+let bot;
+
+if (isVercel) {
+  // Webhook mode for Vercel
+  bot = new TelegramBot(token); // No polling
+  console.log(`Initialized in Webhook mode (Vercel)`);
+} else {
+  // Polling mode for Local/Replit
+  bot = new TelegramBot(token, { polling: true });
+  console.log("Initialized in Polling mode");
+}
+
+/* 
+ * WEBHOOK ENDPOINTS 
+ * Required for Vercel deployment where Polling is not supported.
+ */
+
+// Route to receive updates from Telegram
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// Route to manually set webhook
+app.get("/set-webhook", async (req, res) => {
+  var url = `${hostURL}/bot${token}`;
+  try {
+    await bot.setWebHook(url);
+    res.send(`Webhook set successfully to: ${url}`);
+  } catch (e) {
+    res.send(`Error setting webhook: ${e.message}`);
+  }
+});
+
 
 //TOGGLE for Shorters
 var use1pt = false;
