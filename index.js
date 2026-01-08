@@ -53,6 +53,7 @@ if (isVercel) {
 
 // Route to receive updates from Telegram
 app.post(`/bot${token}`, (req, res) => {
+  console.log("Received webhook update:", JSON.stringify(req.body, null, 2));
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
